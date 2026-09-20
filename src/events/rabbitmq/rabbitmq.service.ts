@@ -47,7 +47,7 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       this.channel = await this.connection.createChannel();
       this.logger.log('✅ Connected to RabbitMQ successfully');
 
-      // Event listener para monitorar a conexão
+      // Event listeners para monitorar a conexão
       this.connection.on('error', (err) => {
         this.logger.error('❌ RabbitMQ connection error:', err);
       });
@@ -65,19 +65,22 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       });
     } catch (error) {
       this.logger.warn(
-        '⚠️ Failed to connect to RabbitMQ, cotinuing wihout message queue:',
-        error,
+        '⚠️ Failed to connect to RabbitMQ, continuing without message queue:',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        error.message || error,
       );
     }
   }
 
   private async disconnect() {
     try {
+      // Fecha canal primeiro
       if (this.channel) {
         await this.channel.close();
         this.logger.log('✅ RabbitMQ channel closed');
       }
 
+      // Depois fecha a conexão
       if (this.connection) {
         await this.connection.close();
         this.logger.log('✅ Disconnected from RabbitMQ');
@@ -105,10 +108,8 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(
           '⚠️ RabbitMQ channel not available, skipping message publish',
         );
-
         return;
       }
-
       await this.channel.assertExchange(exchange, 'topic', { durable: true });
       const messageBuffer = Buffer.from(JSON.stringify(message));
 
@@ -123,13 +124,14 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
         },
       );
 
-      this.logger.log(`✅ Message published to ${exchange}:${routingKey}`);
-      this.logger.debug(`Message content: ${JSON.stringify(message)}`);
       if (!published) {
         throw new Error('Failed to publish message to RabbitMQ');
       }
+
+      this.logger.log(`✅ Message published to ${exchange}:${routingKey}`);
+      this.logger.debug(`Message content: ${JSON.stringify(message)}`);
     } catch (error) {
-      this.logger.error('❌ Error publishing message to RabbitMQ:', error);
+      this.logger.error(`❌ Error publishing message to RabbitMQ:`, error);
     }
   }
 
@@ -151,9 +153,7 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
         throw new Error('RabbitMQ channel not available');
       }
 
-      await this.channel.assertExchange(exchange, 'topic', {
-        durable: true,
-      });
+      await this.channel.assertExchange(exchange, 'topic', { durable: true });
 
       const retryExchange = `${exchange}.retry.dlx`;
       await this.channel.assertExchange(retryExchange, 'topic', {
@@ -176,6 +176,7 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       });
 
       const routingKeyDlq = `${routingKey}.dlq`;
+
       await this.channel.bindQueue(dlqName, dlxExchange, routingKeyDlq);
 
       // Retry
@@ -211,7 +212,6 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
       });
 
       await this.channel.bindQueue(queue.queue, exchange, routingKey);
-
       await this.channel.prefetch(1);
 
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -233,10 +233,13 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
             this.channel.ack(msg);
 
             this.logger.log(
-              `✅ Message processed succesfully from queue: ${queueName}`,
+              `✅ Message processed successfully from queue: ${queueName}`,
             );
+
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
           } catch (error) {
             const retryCount = this.getRetryCount(msg);
+
             if (retryCount < maxRetries) {
               this.logger.warn(
                 `⚠️ Processing failed (attempt ${retryCount + 1}/${maxRetries + 1}). ` +
@@ -259,7 +262,6 @@ export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
           }
         }
       });
-
       this.logger.log(`✅ Subscribed to queue: ${queueName}`);
       this.logger.log(
         `🔄 Retry queue: ${retryQueueName} (${retryDelayMs}ms delay)`,

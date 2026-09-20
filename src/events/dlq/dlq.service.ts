@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PaymentOrderMessage } from '../payment-queue.interface';
-import { RabbitmqService } from '../habbitmq/habbitmq.service';
+import { RabbitmqService } from '../rabbitmq/rabbitmq.service';
 
 export interface DLQMessage {
   content: PaymentOrderMessage;
